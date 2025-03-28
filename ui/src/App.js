@@ -6,6 +6,7 @@ import DeploymentManagement from './pages/DeploymentManagement';
 import MonitoringPanel from './pages/MonitoringPanel';
 import CredentialManager from './pages/CredentialManager';
 import Settings from './pages/Settings';
+import HowTo from './pages/HowTo';
 
 // Import Icons
 import {
@@ -14,7 +15,8 @@ import {
   FaCubes,
   FaChartLine,
   FaKey,
-  FaCog
+  FaCog,
+  FaQuestionCircle
 } from 'react-icons/fa';
 
 function App() {
@@ -27,6 +29,7 @@ function App() {
     { name: 'Monitoring Panel', icon: <FaChartLine />, component: <MonitoringPanel /> },
     { name: 'Credential Manager', icon: <FaKey />, component: <CredentialManager /> },
     { name: 'Settings', icon: <FaCog />, component: <Settings /> },
+    { name: 'How-To', icon: <FaQuestionCircle />, component: <HowTo /> },
   ];
 
   const renderPage = () => {
