@@ -12,6 +12,7 @@ $ErrorActionPreference = "Stop"
 # Define paths and variables
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $EnvFile = Join-Path $RepoRoot ".env"
+$SettingsFile = Join-Path $RepoRoot "scripts\settings\braveSettings.env"
 $ClaudeConfigDir = Join-Path $env:APPDATA "Claude"
 $ClaudeConfig = Join-Path $ClaudeConfigDir "claude_desktop_config.json"
 $DockerImage = "mcp/brave-search:latest"
@@ -46,19 +47,57 @@ if (-not (Test-Path $EnvFile)) {
     exit 1
 }
 
-# Extract API key from .env file
-$envContent = Get-Content $EnvFile -Raw
-if ($envContent -match 'BRAVE_API_KEY=(.+)') {
-    $BraveApiKey = $matches[1]
-    if ([string]::IsNullOrWhiteSpace($BraveApiKey)) {
-        Write-Host "Error: BRAVE_API_KEY is empty in .env file" -ForegroundColor Red
+# Load settings from braveSettings.env if it exists
+if (Test-Path $SettingsFile) {
+    Write-Host "Loading settings from $SettingsFile..."
+    $settings = @{}
+    Get-Content $SettingsFile | ForEach-Object {
+        if (-not [string]::IsNullOrWhiteSpace($_) -and -not $_.StartsWith('#')) {
+            $line = $_.Trim()
+            if ($line -match '(.+?)=(.*)') {
+                $key = $matches[1].Trim()
+                $value = $matches[2].Trim()
+                
+                # Only set if value is not empty
+                if (-not [string]::IsNullOrWhiteSpace($value)) {
+                    $settings[$key] = $value
+                }
+            }
+        }
+    }
+    
+    # Apply settings if they exist
+    if ($settings.ContainsKey("CONTAINER_NAME") -and -not [string]::IsNullOrWhiteSpace($settings["CONTAINER_NAME"])) {
+        $ContainerName = $settings["CONTAINER_NAME"]
+        Write-Host "Using custom container name: $ContainerName" -ForegroundColor Cyan
+    }
+    
+    if ($settings.ContainsKey("DOCKER_IMAGE") -and -not [string]::IsNullOrWhiteSpace($settings["DOCKER_IMAGE"])) {
+        $DockerImage = $settings["DOCKER_IMAGE"]
+        Write-Host "Using custom Docker image: $DockerImage" -ForegroundColor Cyan
+    }
+    
+    if ($settings.ContainsKey("BRAVE_API_KEY") -and -not [string]::IsNullOrWhiteSpace($settings["BRAVE_API_KEY"])) {
+        [Environment]::SetEnvironmentVariable("BRAVE_API_KEY", $settings["BRAVE_API_KEY"], "Process")
+        Write-Host "Using BRAVE_API_KEY from settings file" -ForegroundColor Cyan
+    }
+}
+
+# Extract API key from .env file if not already set from settings file
+if (-not [Environment]::GetEnvironmentVariable("BRAVE_API_KEY", "Process")) {
+    $envContent = Get-Content $EnvFile -Raw
+    if ($envContent -match 'BRAVE_API_KEY=(.+)') {
+        $BraveApiKey = $matches[1]
+        if ([string]::IsNullOrWhiteSpace($BraveApiKey)) {
+            Write-Host "Error: BRAVE_API_KEY is empty in .env file" -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        Write-Host "Error: BRAVE_API_KEY not found in .env file" -ForegroundColor Red
         exit 1
     }
-} else {
-    Write-Host "Error: BRAVE_API_KEY not found in .env file" -ForegroundColor Red
-    exit 1
+    Write-Host "✅ BRAVE_API_KEY found in .env file" -ForegroundColor Green
 }
-Write-Host "✅ BRAVE_API_KEY found in .env file" -ForegroundColor Green
 
 # Step 2: Ensure Docker image is built
 Write-Host "Checking if Docker image exists..."

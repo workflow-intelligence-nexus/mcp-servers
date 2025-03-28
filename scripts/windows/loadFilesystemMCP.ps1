@@ -10,11 +10,11 @@ $ErrorActionPreference = "Stop"
 
 # Define paths and variables
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$ClaudeConfigDir = Join-Path $env:APPDATA "Claude"
-$ClaudeConfig = Join-Path $ClaudeConfigDir "claude_desktop_config.json"
+$SettingsFile = Join-Path $RepoRoot "scripts\settings\filesystemSettings.env"
 $DockerImage = "mcp/filesystem:latest"
 $ContainerName = "filesystem-mcp-server"
-$SettingsFile = Join-Path $RepoRoot "filesystemSettings.env"
+$ClaudeConfigDir = Join-Path $env:APPDATA "Claude"
+$ClaudeConfig = Join-Path $ClaudeConfigDir "claude_desktop_config.json"
 
 # Function to load directory settings from filesystemSettings.env
 function Import-FilesystemSettings {
