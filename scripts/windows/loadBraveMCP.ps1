@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 # Define paths and variables
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $EnvFile = Join-Path $RepoRoot ".env"
-$ClaudeConfigDir = Join-Path $env:APPDATA "claude-desktop"
+$ClaudeConfigDir = Join-Path $env:APPDATA "Claude"
 $ClaudeConfig = Join-Path $ClaudeConfigDir "claude_desktop_config.json"
 $DockerImage = "mcp/brave-search:latest"
 $ContainerName = "brave-mcp-server"
@@ -98,7 +98,7 @@ if (-not (Test-ContainerRunning -ContainerName $ContainerName)) {
 
 # Step 4: Update Claude Desktop config if needed
 Write-Host "Checking Claude Desktop configuration..."
-if (-not (Test-Path $ClaudeConfig)) {
+if ((-not (Test-Path $ClaudeConfig)) -or ((Get-Content $ClaudeConfig -Raw).Trim() -eq "{}")) {
     Write-Host "Creating Claude Desktop config file..."
     
     # Create directory if it doesn't exist
@@ -142,10 +142,15 @@ if (-not (Test-Path $ClaudeConfig)) {
         Copy-Item $ClaudeConfig "$ClaudeConfig.bak"
         
         # Parse the existing JSON
-        $config = Get-Content $ClaudeConfig | ConvertFrom-Json
-        
-        # Add brave-search to mcpServers if mcpServers exists
-        if ($config.mcpServers) {
+        try {
+            $config = Get-Content $ClaudeConfig -Raw | ConvertFrom-Json
+            
+            # Add mcpServers section if it doesn't exist
+            if (-not $config.mcpServers) {
+                $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value @{}
+            }
+            
+            # Add brave-search to mcpServers
             $braveSearch = @{
                 command = "docker"
                 args = @("run", "-i", "--rm", "-e", "BRAVE_API_KEY", "mcp/brave-search")
@@ -155,23 +160,40 @@ if (-not (Test-Path $ClaudeConfig)) {
             }
             
             # Add the new property
-            $config.mcpServers | Add-Member -MemberType NoteProperty -Name "brave-search" -Value $braveSearch
-        } else {
-            # Add mcpServers section if it doesn't exist
-            $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value @{
-                "brave-search" = @{
-                    command = "docker"
-                    args = @("run", "-i", "--rm", "-e", "BRAVE_API_KEY", "mcp/brave-search")
-                    env = @{
-                        BRAVE_API_KEY = $BraveApiKey
-                    }
-                }
-            }
+            $config.mcpServers | Add-Member -MemberType NoteProperty -Name "brave-search" -Value $braveSearch -Force
+            
+            # Save the updated config
+            $config | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfig
+            Write-Host "✅ Claude Desktop config updated" -ForegroundColor Green
         }
-        
-        # Save the updated config
-        $config | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfig
-        Write-Host "✅ Claude Desktop config updated" -ForegroundColor Green
+        catch {
+            Write-Host "Error parsing existing config. Creating new config file..." -ForegroundColor Yellow
+            
+            # Create the config file with the Brave MCP server configuration
+            $configJson = @"
+{
+  "mcpServers": {
+    "brave-search": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "BRAVE_API_KEY",
+        "mcp/brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "$BraveApiKey"
+      }
+    }
+  }
+}
+"@
+            
+            Set-Content -Path $ClaudeConfig -Value $configJson
+            Write-Host "✅ Claude Desktop config created" -ForegroundColor Green
+        }
     }
 }
 
