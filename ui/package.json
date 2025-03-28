@@ -1,0 +1,59 @@
+{
+  "name": "mcp-deployment-manager-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend UI for the MCP Deployment Manager",
+  "main": "electron.js",
+  "homepage": "./",
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-icons": "^5.5.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0",
+    "cross-env": "^7.0.0",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.0.0",
+    "electron-is-dev": "^2.0.0",
+    "react-scripts": "5.0.1",
+    "wait-on": "^7.0.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "electron:start": "concurrently \"cross-env BROWSER=none PORT=3011 yarn start\" \"wait-on http://localhost:3011 && electron .\"",
+    "electron:build": "yarn build && electron-builder -c.extraMetadata.main=electron.js"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "build": {
+    "appId": "com.example.mcp-deployment-manager",
+    "files": [
+      "build/**/*",
+      "node_modules/**/*",
+      "electron.js"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    }
+  }
+}

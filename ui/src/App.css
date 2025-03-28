@@ -1,0 +1,216 @@
+:root {
+  /* Refined Modern Color Palette */
+  --primary-color: #4A90E2; /* Slightly softer blue */
+  --primary-hover: #357ABD;
+  --secondary-color: #7F8C8D; /* Muted gray */
+  --light-bg: #ECF0F1; /* Lighter gray */
+  --dark-bg: #2C3E50; /* Dark Slate Blue */
+  --white: #FFFFFF;
+  --text-color-light: #ECF0F1; /* Light Text (for dark backgrounds) */
+  --text-color-dark: #34495E; /* Darker Text (for light backgrounds) */
+  --border-color: #BDC3C7; /* Softer Border */
+  --shadow-color: rgba(0, 0, 0, 0.08);
+
+  --sidebar-width: 260px;
+  --header-height: 60px; /* If we add a header later */
+  --base-border-radius: 8px; /* More pronounced rounding */
+  --base-padding: 20px;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--light-bg);
+  color: var(--text-color-dark);
+  line-height: 1.6;
+}
+
+.App {
+  display: flex;
+  height: 100vh;
+  overflow: hidden; /* Prevent body scroll */
+}
+
+/* --- Sidebar --- */
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--dark-bg);
+  color: var(--text-color-light);
+  padding: 25px 10px; /* Adjust padding */
+  display: flex;
+  flex-direction: column;
+  box-shadow: 3px 0 8px var(--shadow-color);
+  transition: width 0.3s ease;
+  flex-shrink: 0; /* Prevent sidebar from shrinking */
+  z-index: 10; /* Ensure sidebar is above content shadow */
+}
+
+.sidebar h2 {
+  font-size: 1.3rem; /* Slightly smaller */
+  font-weight: 600;
+  margin: 0 var(--base-padding) 35px var(--base-padding);
+  padding-bottom: 20px;
+  text-align: center;
+  color: var(--white);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0 var(--base-padding);
+  margin: 0;
+  flex-grow: 1;
+}
+
+.sidebar li {
+  padding: 12px 15px; /* Adjust padding */
+  margin-bottom: 8px;
+  border-radius: var(--base-border-radius);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 12px; /* Space between icon and text */
+}
+
+.sidebar li:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar li.active {
+  background-color: var(--primary-color);
+  color: var(--white);
+  font-weight: 500;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Icon Styling Placeholder */
+.sidebar li svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0; /* Prevent icon squishing */
+}
+
+/* --- Content Area --- */
+.content {
+  flex-grow: 1;
+  padding: var(--base-padding) 30px; /* Consistent padding */
+  overflow-y: auto;
+  background-color: var(--white); /* White background for content */
+}
+
+.content h1 {
+  font-size: 1.8rem; /* Adjust size */
+  font-weight: 600;
+  margin-top: 10px; /* Add some space */
+  margin-bottom: 25px;
+  color: var(--text-color-dark);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 15px;
+}
+
+/* --- Card Style --- */
+.card {
+  background-color: var(--white);
+  border-radius: var(--base-border-radius);
+  box-shadow: 0 3px 10px var(--shadow-color);
+  padding: var(--base-padding);
+  margin-bottom: var(--base-padding);
+  border: 1px solid var(--border-color);
+}
+
+.card-header {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: -var(--base-padding) -var(--base-padding) var(--base-padding) -var(--base-padding);
+  padding: 15px var(--base-padding);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--light-bg);
+  border-top-left-radius: var(--base-border-radius);
+  border-top-right-radius: var(--base-border-radius);
+}
+
+/* --- Basic Element Styling --- */
+button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: var(--base-border-radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  background-color: var(--primary-hover);
+  box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+/* Add styles for other form elements as needed, applying --base-border-radius */
+input[type="text"],
+select,
+textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--base-border-radius); /* Consistent rounding */
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input[type="text"]:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--base-border-radius);
+  overflow: hidden; /* Clip content to rounded corners */
+  box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+thead {
+  background-color: var(--light-bg);
+}
+
+th,
+td {
+  border: none;
+  border-bottom: 1px solid var(--border-color); /* Use bottom borders */
+  padding: 12px 15px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+th {
+  font-weight: 600;
+}
+
+pre {
+  background-color: var(--dark-bg);
+  color: var(--text-color-light);
+  padding: 15px;
+  border-radius: var(--base-border-radius);
+  overflow-x: auto;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+}
