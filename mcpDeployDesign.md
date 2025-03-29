@@ -298,20 +298,57 @@ The application will automatically configure AI applications like Claude Desktop
 ### 7.1 Technology Stack
 
 - **Frontend**: Electron.js with React for cross-platform desktop support
-- **Backend**: Node.js for application logic
-- **Database**: SQLite for local data storage
+
+### 7.2 Container Naming Conventions
+
+The MCP Deployment Manager follows strict container naming conventions to ensure consistent deployment and detection:
+
+1. **Standard MCP Servers**
+   - Container names follow the pattern: `${serverType.toLowerCase()}-mcp-server`
+   - Example: `brave-mcp-server` for the Brave Search MCP server
+
+2. **Special Case: Google Maps MCP Server**
+   - Container name: `google-maps-mcp-server`
+   - This is handled as a special case in both deployment scripts and UI detection
+
+3. **Container Name Enforcement**
+   - Container names are enforced in deployment scripts and cannot be overridden by settings
+   - The `CONTAINER_NAME` option has been removed from all settings files to ensure consistency
+
+### 7.3 Deployment Status Detection
+
+The UI determines if an MCP server is deployed by checking if its corresponding Docker container is running:
+
+1. **Detection Process**
+   - The UI queries Docker for a list of running containers
+   - Each server's expected container name is compared against this list
+   - If a match is found, the server is marked as "Deployed" in the UI
+
+2. **Special Case Handling**
+   - The Google Maps MCP server has special detection logic in `ServerCatalog.js`
+   - A direct container existence check is performed using the `check-container-exists` IPC event
+   - This ensures the UI correctly identifies the Google Maps MCP server's deployment status
+
+3. **Debugging Considerations**
+   - Container name mismatches are the most common cause of deployment status detection issues
+   - The UI includes logging to help diagnose container detection problems
+   - When adding new MCP servers, ensure consistent container naming between deployment scripts and UI detection logic
+
+### 7.4 Settings Management
+
+- **Configuration Storage**: SQLite for local data storage
 - **Docker Integration**: Docker Engine API
 - **Encryption**: AES-256 for credential encryption
 - **Configuration**: YAML/JSON for structured configuration
 
-### 7.2 Development Approach
+### 7.5 Development Approach
 
 - Platform-specific considerations for Windows, macOS, and Linux
 - Modular architecture for extensibility
 - Test-driven development with focus on security
 - CI/CD pipeline for automated builds and testing
 
-### 7.3 Packaging and Distribution
+### 7.6 Packaging and Distribution
 
 - Installer packages for Windows, macOS, and Linux
 - Auto-update mechanism

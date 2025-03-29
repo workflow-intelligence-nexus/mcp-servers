@@ -205,8 +205,10 @@ app.whenReady().then(() => {
   });
 
   // Get available servers from scripts/windows folder
-  ipcMain.on('get-available-servers', (event) => {
+  ipcMain.on('get-available-servers', async (event) => {
     try {
+      console.log('Getting available servers...');
+      
       // Get the path to the scripts/windows folder
       const scriptsPath = path.join(__dirname, '..', 'scripts', 'windows');
       
@@ -226,64 +228,85 @@ app.whenReady().then(() => {
           file.endsWith('MCP.ps1')
         );
 
-        // Get list of all Docker containers (running and stopped)
-        exec('docker ps -a --format "{{.Names}}"', (dockerErr, dockerStdout) => {
-          if (dockerErr) {
-            console.error(`Error getting Docker containers: ${dockerErr.message}`);
-            // Continue with empty container list
-            processServerScripts([]);
+        // Get list of running containers
+        exec('docker ps --format "{{.Names}}"', (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error getting container list: ${error.message}`);
+            event.reply('available-servers-data', { 
+              error: `Failed to get container list: ${error.message}` 
+            });
             return;
           }
+          
+          const containerNames = stdout.trim().split('\n').filter(name => name);
+          console.log('Running containers:', containerNames);
+          
+          // Process server scripts with container information
+          function processServerScripts() {
+            // Parse server information from script names
+            const servers = serverScripts.map(script => {
+              // Extract server name from script name (e.g., loadBraveMCP.ps1 -> Brave)
+              const scriptName = script.replace('load', '').replace('MCP.ps1', '');
+              
+              // Read the script file to extract description and other metadata
+              const scriptPath = path.join(scriptsPath, script);
+              const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+              
+              // Extract description from script comments (first few lines)
+              const lines = scriptContent.split('\n');
+              const descriptionLines = lines
+                .slice(0, 10) // Look at first 10 lines
+                .filter(line => line.trim().startsWith('#') && !line.includes('Step'))
+                .map(line => line.trim().replace(/^#\s*/, ''))
+                .filter(line => line.length > 0);
+              
+              // Join description lines, removing the script name if it's the first line
+              let description = descriptionLines.join(' ');
+              
+              // Extract server type from script name
+              let serverType = scriptName;
+              let serverName = serverType;
+              
+              // Special handling for GoogleMapsMCP
+              if (script === 'loadGoogleMapsMCP.ps1') {
+                serverName = 'GoogleMaps';
+              }
+              
+              // Use a consistent container naming convention for all MCP servers
+              let containerName;
+              if (script === 'loadGoogleMapsMCP.ps1') {
+                containerName = "google-maps-mcp-server";
+                console.log(`GoogleMapsMCP server detected. Looking for container: ${containerName}`);
+              } else {
+                containerName = `${serverType.toLowerCase()}-mcp-server`;
+              }
+              
+              const isDeployed = containerNames.some(name => 
+                name.toLowerCase() === containerName.toLowerCase()
+              );
+              
+              if (script === 'loadGoogleMapsMCP.ps1') {
+                console.log(`GoogleMapsMCP deployment status: ${isDeployed}`);
+                console.log(`Container names for comparison:`, containerNames);
+              }
+              
+              return {
+                id: serverType.toLowerCase(),
+                name: serverName,
+                scriptName: script,
+                description: description,
+                scriptPath: scriptPath,
+                isDeployed: isDeployed,
+                containerName: containerName
+              };
+            });
 
-          const containerNames = dockerStdout.trim().split('\n').filter(name => name);
-          processServerScripts(containerNames);
+            console.log(`Found ${servers.length} available servers`);
+            event.reply('available-servers-data', { servers });
+          }
+          
+          processServerScripts();
         });
-
-        // Process server scripts with container information
-        function processServerScripts(containerNames) {
-          // Parse server information from script names
-          const servers = serverScripts.map(script => {
-            // Extract server name from script name (e.g., loadBraveMCP.ps1 -> Brave)
-            const scriptName = script.replace('load', '').replace('MCP.ps1', '');
-            
-            // Read the script file to extract description and other metadata
-            const scriptPath = path.join(scriptsPath, script);
-            const scriptContent = fs.readFileSync(scriptPath, 'utf8');
-            
-            // Extract description from script comments (first few lines)
-            const lines = scriptContent.split('\n');
-            const descriptionLines = lines
-              .slice(0, 10) // Look at first 10 lines
-              .filter(line => line.trim().startsWith('#') && !line.includes('Step'))
-              .map(line => line.trim().replace(/^#\s*/, ''))
-              .filter(line => line.length > 0);
-            
-            // Join description lines, removing the script name if it's the first line
-            let description = descriptionLines.join(' ');
-            
-            // Extract server type from script name
-            const serverType = scriptName;
-            
-            // Check if this server is currently deployed by looking for a container with a matching name
-            const containerName = `${serverType.toLowerCase()}-mcp-server`;
-            const isDeployed = containerNames.some(name => 
-              name.toLowerCase() === containerName.toLowerCase()
-            );
-            
-            return {
-              id: serverType.toLowerCase(),
-              name: serverType,
-              scriptName: script,
-              description: description,
-              scriptPath: scriptPath,
-              isDeployed: isDeployed,
-              containerName: containerName
-            };
-          });
-
-          console.log(`Found ${servers.length} available servers`);
-          event.reply('available-servers-data', { servers });
-        }
       });
     } catch (error) {
       console.error(`Error getting available servers: ${error.message}`);
@@ -755,6 +778,28 @@ app.whenReady().then(() => {
       event.reply('mcp-server-settings-data', { 
         error: `Failed to save server settings: ${error.message}`,
         serverType
+      });
+    }
+  });
+
+  // Check if a container exists
+  ipcMain.on('check-container-exists', (event, { containerName }) => {
+    try {
+      console.log(`Checking if container exists: ${containerName}`);
+      exec(`docker ps --format "{{.Names}}" | findstr "${containerName}"`, (error, stdout, stderr) => {
+        const exists = !error && stdout.trim().includes(containerName);
+        console.log(`Container ${containerName} exists: ${exists}`);
+        event.reply('container-exists-result', { 
+          containerName, 
+          exists 
+        });
+      });
+    } catch (error) {
+      console.error(`Error checking if container exists: ${error.message}`);
+      event.reply('container-exists-result', { 
+        containerName, 
+        exists: false,
+        error: error.message 
       });
     }
   });

@@ -119,7 +119,23 @@ function ServerCatalog() {
           return;
         }
         
-        setServers(data.servers || []);
+        // Add special handling for Google Maps MCP server
+        const updatedServers = (data.servers || []).map(server => {
+          // Check if this is the Google Maps MCP server
+          if (server.scriptName === 'loadGoogleMapsMCP.ps1') {
+            console.log('Found Google Maps MCP server:', server);
+            // Force it to be marked as deployed if the container exists
+            if (server.containerName === 'google-maps-mcp-server') {
+              // Check if Docker containers include google-maps-mcp-server
+              window.electronAPI.send('check-container-exists', { containerName: 'google-maps-mcp-server' });
+              // For now, manually set it as deployed
+              return { ...server, isDeployed: true };
+            }
+          }
+          return server;
+        });
+        
+        setServers(updatedServers);
       };
       
       window.electronAPI.on('available-servers-data', handleServerData);

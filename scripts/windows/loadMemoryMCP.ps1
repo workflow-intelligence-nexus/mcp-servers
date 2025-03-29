@@ -18,6 +18,9 @@ $ClaudeConfigDir = Join-Path $env:APPDATA "Claude"
 $ClaudeConfig = Join-Path $ClaudeConfigDir "claude_desktop_config.json"
 $MemoryDataPath = Join-Path $RepoRoot ".memory-data"
 
+# Initialize settings with default values
+$settings = @{}
+
 # Function to check if a process is running
 function Test-ProcessRunning {
     param (
@@ -43,45 +46,72 @@ Set-Location $RepoRoot
 # Step 1: Load settings from memorySettings.env if it exists
 if (Test-Path $SettingsFile) {
     Write-Host "Loading settings from $SettingsFile..."
-    $settings = @{}
     Get-Content $SettingsFile | ForEach-Object {
         if (-not [string]::IsNullOrWhiteSpace($_) -and -not $_.StartsWith('#')) {
             $line = $_.Trim()
             if ($line -match '(.+?)=(.*)') {
                 $key = $matches[1].Trim()
                 $value = $matches[2].Trim()
-                
-                # Only set if value is not empty
-                if (-not [string]::IsNullOrWhiteSpace($value)) {
-                    $settings[$key] = $value
-                }
+                $settings[$key] = $value
             }
         }
     }
+    Write-Host "Settings loaded successfully."
+} else {
+    Write-Host "Settings file not found at $SettingsFile. Using default settings." -ForegroundColor Yellow
     
-    # Apply settings if they exist
-    if ($settings.ContainsKey("CONTAINER_NAME") -and -not [string]::IsNullOrWhiteSpace($settings["CONTAINER_NAME"])) {
-        $ContainerName = $settings["CONTAINER_NAME"]
-        Write-Host "Using custom container name: $ContainerName" -ForegroundColor Cyan
+    # Create settings directory if it doesn't exist
+    $settingsDir = Join-Path $RepoRoot "scripts\settings"
+    if (-not (Test-Path $settingsDir)) {
+        New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+        Write-Host "Created settings directory at $settingsDir" -ForegroundColor Green
     }
     
-    if ($settings.ContainsKey("DOCKER_IMAGE") -and -not [string]::IsNullOrWhiteSpace($settings["DOCKER_IMAGE"])) {
-        $DockerImage = $settings["DOCKER_IMAGE"]
-        Write-Host "Using custom Docker image: $DockerImage" -ForegroundColor Cyan
-    }
-    
-    if ($settings.ContainsKey("MEMORY_DATA_PATH") -and -not [string]::IsNullOrWhiteSpace($settings["MEMORY_DATA_PATH"])) {
-        $MemoryDataPath = $settings["MEMORY_DATA_PATH"]
-        if (-not [System.IO.Path]::IsPathRooted($MemoryDataPath)) {
-            $MemoryDataPath = Join-Path $RepoRoot $MemoryDataPath
-        }
-        Write-Host "Using custom memory data path: $MemoryDataPath" -ForegroundColor Cyan
+    # Create example settings file if it doesn't exist
+    $exampleSettingsFile = Join-Path $RepoRoot "scripts\settings\memorySettings.example.env"
+    if (-not (Test-Path $exampleSettingsFile)) {
+        @'
+# Memory MCP Server Settings
+# Copy this file to memorySettings.env and modify as needed
+
+# Set to 'false' to prevent automatic Claude Desktop restart
+RESTART_CLAUDE=true
+
+# Memory data storage path (default is .memory-data in repo root)
+# MEMORY_DATA_PATH=C:\path\to\memory\data
+
+# Custom container name (optional)
+# CONTAINER_NAME=memory-mcp-server
+
+# Custom Docker image (optional)
+# DOCKER_IMAGE=mcp/memory:latest
+'@ | Set-Content $exampleSettingsFile
+        Write-Host "Created example settings file at $exampleSettingsFile" -ForegroundColor Green
     }
 }
 
-# Ensure memory data directory exists
+# Apply settings if they exist
+if ($settings.ContainsKey("CONTAINER_NAME") -and -not [string]::IsNullOrWhiteSpace($settings["CONTAINER_NAME"])) {
+    $ContainerName = $settings["CONTAINER_NAME"]
+    Write-Host "Using custom container name: $ContainerName" -ForegroundColor Cyan
+}
+
+if ($settings.ContainsKey("DOCKER_IMAGE") -and -not [string]::IsNullOrWhiteSpace($settings["DOCKER_IMAGE"])) {
+    $DockerImage = $settings["DOCKER_IMAGE"]
+    Write-Host "Using custom Docker image: $DockerImage" -ForegroundColor Cyan
+}
+
+if ($settings.ContainsKey("MEMORY_DATA_PATH") -and -not [string]::IsNullOrWhiteSpace($settings["MEMORY_DATA_PATH"])) {
+    $MemoryDataPath = $settings["MEMORY_DATA_PATH"]
+    if (-not [System.IO.Path]::IsPathRooted($MemoryDataPath)) {
+        $MemoryDataPath = Join-Path $RepoRoot $MemoryDataPath
+    }
+    Write-Host "Using custom memory data path: $MemoryDataPath" -ForegroundColor Cyan
+}
+
+# Create memory data directory if it doesn't exist
 if (-not (Test-Path $MemoryDataPath)) {
-    New-Item -ItemType Directory -Path $MemoryDataPath | Out-Null
+    New-Item -ItemType Directory -Path $MemoryDataPath -Force | Out-Null
     Write-Host "Created memory data directory at $MemoryDataPath" -ForegroundColor Green
 }
 
@@ -99,9 +129,9 @@ if (-not $imageExists) {
         exit 1
     }
     
-    Write-Host "✅ Docker image built successfully" -ForegroundColor Green
+    Write-Host " Docker image built successfully" -ForegroundColor Green
 } else {
-    Write-Host "✅ Docker image already exists" -ForegroundColor Green
+    Write-Host " Docker image already exists" -ForegroundColor Green
 }
 
 # Step 3: Start Docker container if not already running
@@ -109,31 +139,31 @@ Write-Host "Checking if Docker container is running..."
 if (-not (Test-ContainerRunning -ContainerName $ContainerName)) {
     Write-Host "Starting Docker container..."
     
-    # Remove container if it exists but is not running
-    docker rm $ContainerName 2>$null
-    
-    # Create volume mount for memory data
-    $memoryDataDir = Split-Path -Parent $MemoryDataPath
-    $memoryDataDirName = Split-Path -Leaf $MemoryDataPath
+    # Check if container exists before trying to remove it
+    $containerExists = docker ps -a --format "{{.Names}}" | Where-Object { $_ -eq $ContainerName }
+    if ($containerExists) {
+        Write-Host "Removing existing stopped container..."
+        docker rm $ContainerName 2>$null
+    }
     
     # Start Docker container in interactive mode with a pseudo-TTY
-    $dockerRunCommand = "docker run -it --name $ContainerName"
-    $dockerRunCommand += " -v `"$MemoryDataPath`":/app/data"
+    $dockerRunCommand = "docker run -d --name $ContainerName"
+    $dockerRunCommand += " -v `"$($MemoryDataPath):/app/data`""
     $dockerRunCommand += " $DockerImage"
     
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $dockerRunCommand -WindowStyle Hidden
+    Invoke-Expression $dockerRunCommand
     
     # Wait a moment for the container to start
     Start-Sleep -Seconds 2
     
     if (Test-ContainerRunning -ContainerName $ContainerName) {
-        Write-Host "✅ Docker container started successfully" -ForegroundColor Green
+        Write-Host " Docker container started successfully" -ForegroundColor Green
     } else {
         Write-Host "Error: Failed to start Docker container" -ForegroundColor Red
         exit 1
     }
 } else {
-    Write-Host "✅ Docker container already running" -ForegroundColor Green
+    Write-Host " Docker container already running" -ForegroundColor Green
 }
 
 # Step 4: Update Claude Desktop config
@@ -141,7 +171,7 @@ Write-Host "Updating Claude Desktop config..."
 
 # Create Claude config directory if it doesn't exist
 if (-not (Test-Path $ClaudeConfigDir)) {
-    New-Item -ItemType Directory -Path $ClaudeConfigDir | Out-Null
+    New-Item -ItemType Directory -Path $ClaudeConfigDir -Force | Out-Null
     Write-Host "Created Claude config directory at $ClaudeConfigDir" -ForegroundColor Green
 }
 
@@ -153,13 +183,13 @@ $serverConfig = @{
         "-i"
         "--rm"
         "-v"
-        "$MemoryDataPath:/app/data"
+        "$($MemoryDataPath):/app/data"
         $DockerImage
     )
 }
 
 # Check for empty or non-existent config
-if ((-not (Test-Path $ClaudeConfig)) -or ((Get-Content $ClaudeConfig -Raw).Trim() -eq "{}") -or ((Get-Content $ClaudeConfig -Raw).Trim() -eq "")) {
+if ((-not (Test-Path $ClaudeConfig)) -or ((Get-Content $ClaudeConfig -Raw -ErrorAction SilentlyContinue).Trim() -eq "{}") -or ((Get-Content $ClaudeConfig -Raw -ErrorAction SilentlyContinue).Trim() -eq "")) {
     # Create new config
     $config = @{
         mcpServers = @{
@@ -169,27 +199,26 @@ if ((-not (Test-Path $ClaudeConfig)) -or ((Get-Content $ClaudeConfig -Raw).Trim(
     
     # Save the config
     $config | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfig
-    Write-Host "✅ Created new Claude Desktop config with memory MCP server" -ForegroundColor Green
+    Write-Host " Created new Claude Desktop config with memory MCP server" -ForegroundColor Green
 } else {
-    # Update existing config
     try {
-        $config = Get-Content $ClaudeConfig -Raw | ConvertFrom-Json
+        # Load existing config
+        $config = Get-Content $ClaudeConfig -Raw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
         
-        # Add mcpServers section if it doesn't exist
-        if (-not $config.mcpServers) {
-            $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value @{}
+        # Ensure mcpServers section exists
+        if (-not $config.ContainsKey("mcpServers")) {
+            $config["mcpServers"] = @{}
         }
         
-        # Add server configuration
-        $config.mcpServers | Add-Member -MemberType NoteProperty -Name "memory" -Value $serverConfig -Force
+        # Add or update memory server config
+        $config["mcpServers"]["memory"] = $serverConfig
         
         # Save the updated config
         $config | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfig
-        Write-Host "✅ Updated Claude Desktop config with memory MCP server" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "Error updating Claude Desktop config: $_" -ForegroundColor Red
-        Write-Host "Creating new config file..." -ForegroundColor Yellow
+        Write-Host " Updated Claude Desktop config with memory MCP server" -ForegroundColor Green
+    } catch {
+        Write-Host "Warning: Failed to update Claude Desktop config: $_" -ForegroundColor Yellow
+        Write-Host "Creating new config file instead..." -ForegroundColor Yellow
         
         # Create new config
         $config = @{
@@ -200,7 +229,7 @@ if ((-not (Test-Path $ClaudeConfig)) -or ((Get-Content $ClaudeConfig -Raw).Trim(
         
         # Save the config
         $config | ConvertTo-Json -Depth 10 | Set-Content $ClaudeConfig
-        Write-Host "✅ Created new Claude Desktop config with memory MCP server" -ForegroundColor Green
+        Write-Host " Created new Claude Desktop config with memory MCP server" -ForegroundColor Green
     }
 }
 
@@ -219,7 +248,7 @@ if ($restartClaude) {
         Stop-Process -Name $claudeProcessName -Force
         Start-Sleep -Seconds 2
         Start-Process "Claude"
-        Write-Host "✅ Claude Desktop restarted" -ForegroundColor Green
+        Write-Host " Claude Desktop restarted" -ForegroundColor Green
     } else {
         Write-Host "Claude Desktop is not running. No need to restart." -ForegroundColor Yellow
     }
@@ -227,9 +256,10 @@ if ($restartClaude) {
     Write-Host "Skipping Claude Desktop restart as per settings" -ForegroundColor Yellow
 }
 
+# Done!
 Write-Host "`nMemory MCP server setup complete!" -ForegroundColor Green
 Write-Host "You can now use persistent memory features in Claude Desktop" -ForegroundColor Green
 Write-Host "`nUseful commands:" -ForegroundColor Cyan
 Write-Host "- View container logs: docker logs $ContainerName" -ForegroundColor Cyan
 Write-Host "- Stop container: docker stop $ContainerName" -ForegroundColor Cyan
-Write-Host "- Remove container: docker rm $ContainerName" -ForegroundColor Cyan
+Write-Host "- Restart container: docker restart $ContainerName" -ForegroundColor Cyan
